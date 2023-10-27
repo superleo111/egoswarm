@@ -104,6 +104,8 @@ namespace ego_planner
     void setSwarmTrajs(SwarmTrajData *swarm_trajs_ptr);
     void setDroneId(const int drone_id);
 
+    void setOrder(const int order);
+
     // optional inputs
     void setGuidePath(const vector<Eigen::Vector3d> &guide_pt);
     void setWaypoints(const vector<Eigen::Vector3d> &waypts,
@@ -192,6 +194,10 @@ namespace ego_planner
     void calcSwarmCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     void calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     bool check_collision_and_rebound(void);
+
+    // newly add function
+    void calcSwarmCost_new(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
+    void calcTerminalAndLaneCenterCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
 
     static int earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls);
     static double costFunctionRebound(void *func_data, const double *x, double *grad, const int n);

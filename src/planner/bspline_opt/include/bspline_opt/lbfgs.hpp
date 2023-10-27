@@ -1036,6 +1036,8 @@ namespace lbfgs
         int loop;
         double step_min, step_max;
 
+// std::cout << "lbfgs_optimize" << std::endl;
+
         /* Constant parameters and their default values. */
         lbfgs_parameter_t param = (_param != NULL) ? (*_param) : _default_param;
         const int m = param.mem_size;
@@ -1056,7 +1058,7 @@ namespace lbfgs
         cd.proc_evaluate = proc_evaluate;
         cd.proc_stepbound = proc_stepbound;
         cd.proc_progress = proc_progress;
-
+// std::cout << "lbfgs_optimize2" << std::endl;
         /* Check the input parameters for errors. */
         if (n <= 0)
         {
@@ -1121,22 +1123,25 @@ namespace lbfgs
             it->s = (double *)vecalloc(n * sizeof(double));
             it->y = (double *)vecalloc(n * sizeof(double));
         }
-
+// std::cout << "lbfgs_optimize3" << std::endl;
         /* Allocate an array for storing previous values of the objective function. */
         if (0 < param.past)
         {
             pf = (double *)vecalloc(param.past * sizeof(double));
+            // std::cout << "lbfgs_optimize3.1" << std::endl;
         }
-
+std::cout << "lbfgs_optimize3.2" << std::endl;
         /* Evaluate the function value and its gradient. */
         fx = cd.proc_evaluate(cd.instance, x, g, cd.n);
-
+//   double BsplineOptimizer::costFunctionRebound(void *func_data, const double *x, double *grad, const int n)
+//   void BsplineOptimizer::combineCostRebound(const double *x, double *grad, double &f_combine, const int n)
+std::cout << "lbfgs_optimize3.3" << std::endl;
         /* Store the initial value of the objective function. */
         if (pf != NULL)
         {
             pf[0] = fx;
         }
-
+std::cout << "lbfgs_optimize4" << std::endl;
         /*
         Compute the direction;
         we assume the initial hessian matrix H_0 as the identity matrix.

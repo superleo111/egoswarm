@@ -45,7 +45,7 @@ namespace ego_planner
   // !SECTION
 
   // SECTION rebond replanning
-
+  // TOSEE rebound replan
   bool EGOPlannerManager::reboundReplan(Eigen::Vector3d start_pt, Eigen::Vector3d start_vel,
                                         Eigen::Vector3d start_acc, Eigen::Vector3d local_target_pt,
                                         Eigen::Vector3d local_target_vel, bool flag_polyInit, bool flag_randomPolyTraj)
@@ -215,7 +215,18 @@ namespace ego_planner
       }
     } while (flag_regenerate);
 
+
+
+// begin here 
+
+
+
+
+
+
+
     Eigen::MatrixXd ctrl_pts, ctrl_pts_temp;
+    // form bspline, return ctrl_pts 
     UniformBspline::parameterizeToBspline(ts, point_set, start_end_derivatives, ctrl_pts);
 
     vector<std::pair<int, int>> segments;
@@ -231,13 +242,19 @@ namespace ego_planner
     if (pp_.use_distinctive_trajs)
     {
       // cout << "enter" << endl;
+      // ControlPoints contains a matirx of points(a group of points) 
       std::vector<ControlPoints> trajs = bspline_optimizer_->distinctiveTrajs(segments);
       cout << "\033[1;33m"
            << "multi-trajs=" << trajs.size() << "\033[1;0m" << endl;
 
+      // optimal beginning is finalcost =999999
       double final_cost, min_cost = 999999.0;
+
+
+      // this for cycle is for multi trajs
       for (int i = trajs.size() - 1; i >= 0; i--)
       {
+        // TOSEE BsplineOptimizeTrajReboun
         if (bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts_temp, final_cost, trajs[i], ts))
         {
 
@@ -270,6 +287,7 @@ namespace ego_planner
     }
     else
     {
+      // TODO TOSEE
       flag_step_1_success = bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts, ts);
       t_opt = ros::Time::now() - t_start;
       //static int vis_id = 0;
@@ -288,6 +306,12 @@ namespace ego_planner
 
     UniformBspline pos = UniformBspline(ctrl_pts, 3, ts);
     pos.setPhysicalLimits(pp_.max_vel_, pp_.max_acc_, pp_.feasibility_tolerance_);
+
+
+
+
+
+
 
     /*** STEP 3: REFINE(RE-ALLOCATE TIME) IF NECESSARY ***/
     // Note: Only adjust time in single drone mode. But we still allow drone_0 to adjust its time profile.

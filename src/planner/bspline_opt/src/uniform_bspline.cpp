@@ -208,6 +208,12 @@ namespace ego_planner
 
   // void UniformBspline::recomputeInit() {}
 
+// 将给定的点集和起始/结束导数参数化为 B 样条曲线
+// 并将控制点存储在提供的 Eigen::MatrixXd 类型的变量 ctrl_pts 中,通过引用参数 ctrl_pts 修改了函数外部的矩阵对象。
+//     ts：时间步长的值，用于计算 B 样条曲线的导数部分。
+//     point_set：包含点集的向量，每个点表示为 Eigen::Vector3d 类型的三维向量。
+//     start_end_derivative：包含起始和结束导数的向量，每个导数表示为 Eigen::Vector3d 类型的三维向量。
+//     ctrl_pts：用于存储计算得到的控制点的 Eigen::MatrixXd 类型的矩阵。
   void UniformBspline::parameterizeToBspline(const double &ts, const vector<Eigen::Vector3d> &point_set,
                                              const vector<Eigen::Vector3d> &start_end_derivative,
                                              Eigen::MatrixXd &ctrl_pts)

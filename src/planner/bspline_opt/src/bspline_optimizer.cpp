@@ -20,6 +20,11 @@ namespace ego_planner
     nh.param("optimization/order", order_, 3);
   }
 
+  void BsplineOptimizer::setOrder(const int order)
+  {
+    this->order_ = order;
+  }
+
   void BsplineOptimizer::setEnvironment(const GridMap::Ptr &map)
   {
     this->grid_map_ = map;
@@ -355,6 +360,7 @@ namespace ego_planner
 
       // 2.2 Assign params according to the selection table.
       ControlPoints cpsOneSample;
+      std::cout << "distinctiveTrajs" << std::endl;
       cpsOneSample.resize(cps_.size);
       cpsOneSample.clearance = cps_.clearance;
       int cp_id = 0, seg_id = 0, cp_of_seg_id = 0;
@@ -437,6 +443,7 @@ namespace ego_planner
     if (flag_first_init)
     {
       cps_.clearance = dist0_;
+      std::cout << "init ctrl pts" << std::endl;
       cps_.resize(init_points.cols());
       cps_.points = init_points;
     }
@@ -756,6 +763,9 @@ namespace ego_planner
     BsplineOptimizer *opt = reinterpret_cast<BsplineOptimizer *>(func_data);
 
     double cost;
+    // return reference cost
+    // FIXME how grad comes????
+    // std::cout << "enter costFunctionRebound"<< std::endl;
     opt->combineCostRebound(x, grad, cost, n);
 
     opt->iter_num_ += 1;
@@ -773,6 +783,57 @@ namespace ego_planner
     return cost;
   }
 
+  void BsplineOptimizer::calcSwarmCost_new(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+  {
+    cost = 0.0;
+    int end_idx = q.cols() - order_;
+    // double t_now = ros::Time::now().toSec();
+    std::cout<<"q:"<<endl;
+    std::cout << q << std::endl;
+    // std::cout << q.cols() << std::endl;
+    // std::cout << q.col(0) << std::endl;
+    // std::cout << q.col(1) << std::endl;   
+    // std::cout << "end_idx: "<< end_idx << std::endl;  
+    // FIXME i should correspond to time layer
+    for (int i = order_; i < end_idx; i++)
+    {
+
+      for (size_t id = 0; id < swarm_trajs_->size(); id++)
+      {
+        std::cout << "swarm_trajs_ drone_id:" << swarm_trajs_->at(id).drone_id<< std::endl;  
+        std::cout << "drone_id:" << drone_id_<< std::endl;  
+
+        if ((swarm_trajs_->at(id).drone_id != (int)id) || swarm_trajs_->at(id).drone_id == drone_id_)
+        {
+          // std::cout << "continue" << std::endl;  
+          continue;
+        }
+
+        // FIXME evaluateDeBoorT(i*0.5) 函数返回在B样条曲线上参数值为u时的点
+        Eigen::Vector3d swarm_prid = swarm_trajs_->at(id).position_traj_.evaluateDeBoorT((i-1)*0.5);
+
+
+        Eigen::Vector3d dist_vec = swarm_prid - cps_.points.col(i);
+        double distance = dist_vec.squaredNorm();
+        cost += swarm_trajs_->at(id).probability_ * distance;
+        
+        gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec);  
+        std::cout << "swarmprid:\n"<<swarm_prid<< std::endl;  
+        
+        std::cout << "prob:"<<swarm_trajs_->at(id).probability_<< std::endl;  
+        std::cout << "cps pts col:\n"<<cps_.points.col(i)<< std::endl;  
+        std::cout<< "distance:\n"<<distance<<std::endl;
+        std::cout<<"dis vect\n"<<dist_vec <<std::endl;
+        std::cout<<"norm\n"<<dist_vec.normalized() <<std::endl;
+        std::cout<<"gradient:\n"<<gradient<<endl;
+
+
+      }
+
+    }
+    // std::cout << "cost:"<< cost << std::endl;  
+  }
+
   void BsplineOptimizer::calcSwarmCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
   {
     cost = 0.0;
@@ -781,6 +842,7 @@ namespace ego_planner
     double t_now = ros::Time::now().toSec();
     constexpr double a = 2.0, b = 1.0, inv_a2 = 1 / a / a, inv_b2 = 1 / b / b;
 
+    // i-th ctl pts 
     for (int i = order_; i < end_idx; i++)
     {
       double glb_time = t_now + ((double)(order_ - 1) / 2 + (i - order_ + 1)) * bspline_interval_;
@@ -796,12 +858,20 @@ namespace ego_planner
         if (glb_time < traj_i_satrt_time + swarm_trajs_->at(id).duration_ - 0.1)
         {
           /* def cost=(c-sqrt([Q-O]'D[Q-O]))^2, D=[1/b^2,0,0;0,1/b^2,0;0,0,1/a^2] */
+
+          // swarm_prid is the position of id-th drone at the glb_time of the uniform b-spline coordinate
           Eigen::Vector3d swarm_prid = swarm_trajs_->at(id).position_traj_.evaluateDeBoorT(glb_time - traj_i_satrt_time);
+
+          // FIXME i-th ctl pts is one points, but it corresponds to many swarm prid???
+          // FIXME q and ctl-pts difference
           Eigen::Vector3d dist_vec = cps_.points.col(i) - swarm_prid;
+          // 椭圆距离度量（Ellipsoidal Distance Metric），考虑地球表面的曲率，以更准确地测量地球上两个点之间的距离。
           double ellip_dist = sqrt(dist_vec(2) * dist_vec(2) * inv_a2 + (dist_vec(0) * dist_vec(0) + dist_vec(1) * dist_vec(1)) * inv_b2);
           double dist_err = CLEARANCE - ellip_dist;
 
-          Eigen::Vector3d dist_grad = cps_.points.col(i) - swarm_prid;
+          Eigen::Vector3d dist_grad = cps_.points.col(i) - swarm_prid;//=dist_vec
+
+          // FIXME OR NOT why????
           Eigen::Vector3d Coeff;
           Coeff(0) = -2 * (CLEARANCE / ellip_dist - 1) * inv_b2;
           Coeff(1) = Coeff(0);
@@ -825,6 +895,8 @@ namespace ego_planner
       }
     }
   }
+
+  
 
   void BsplineOptimizer::calcMovingObjCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
   {
@@ -876,6 +948,7 @@ namespace ego_planner
     }
 
     /*** calculate distance cost and gradient ***/
+    // i-th ctlpts
     for (auto i = order_; i < end_idx; ++i)
     {
       for (size_t j = 0; j < cps_.direction[i].size(); ++j)
@@ -886,9 +959,10 @@ namespace ego_planner
 
         if (dist_err < 0)
         {
-          /* do nothing */
+          /* do nothing, means dist > safe clearance*/
         }
         else if (dist_err < demarcation)
+        // FIXME demarcation =clearance? what's specific num
         {
           cost += pow(dist_err, 3);
           gradient.col(i) += -3.0 * dist_err * dist_err * dist_grad;
@@ -944,7 +1018,9 @@ namespace ego_planner
 
       for (int i = 0; i < q.cols() - 3; i++)
       {
-        /* evaluate jerk */
+        /* evaluate jerk 加速度的变化率 
+        every q.col is a point, use 4 pts to calculate the derivative of acc
+        jerk is 3D vector */
         jerk = q.col(i + 3) - 3 * q.col(i + 2) + 3 * q.col(i + 1) - q.col(i);
         cost += jerk.squaredNorm();
         temp_j = 2.0 * jerk;
@@ -973,6 +1049,13 @@ namespace ego_planner
     }
   }
 
+  void BsplineOptimizer::calcTerminalAndLaneCenterCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+  {
+    cost = 0.0;
+
+  }
+
+
   void BsplineOptimizer::calcTerminalCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
   {
     cost = 0.0;
@@ -998,7 +1081,7 @@ namespace ego_planner
     //#define SECOND_DERIVATIVE_CONTINOUS
 
 #ifdef SECOND_DERIVATIVE_CONTINOUS
-
+std::cout << "enter calcFeasibilityCost00"<< std::endl;
     cost = 0.0;
     double demarcation = 1.0; // 1m/s, 1m/s/s
     double ar = 3 * demarcation, br = -3 * pow(demarcation, 2), cr = pow(demarcation, 3);
@@ -1117,7 +1200,7 @@ namespace ego_planner
     }
 
 #else
-
+std::cout << "enter calcFeasibilityCost0"<< std::endl;
     cost = 0.0;
     /* abbreviation */
     double ts, /*vm2, am2, */ ts_inv2;
@@ -1126,12 +1209,21 @@ namespace ego_planner
 
     ts = bspline_interval_;
     ts_inv2 = 1 / ts / ts;
-
+std::cout << "enter calcFeasibilityCost01"<< std::endl;
     /* velocity feasibility */
     for (int i = 0; i < q.cols() - 1; i++)
     {
+      std::cout << "enter calcFeasibilityCost02"<< std::endl;
+      std::cout << q << std::endl;
+      std::cout << q.cols() << std::endl;
+      std::cout << q.col(0) << std::endl;
+      std::cout << q.col(1) << std::endl;
       Eigen::Vector3d vi = (q.col(i + 1) - q.col(i)) / ts;
+      // error here
 
+
+
+std::cout << "enter calcFeasibilityCost1"<< std::endl;
       //cout << "temp_v * vi=" ;
       for (int j = 0; j < 3; j++)
       {
@@ -1162,7 +1254,7 @@ namespace ego_planner
     for (int i = 0; i < q.cols() - 2; i++)
     {
       Eigen::Vector3d ai = (q.col(i + 2) - 2 * q.col(i + 1) + q.col(i)) * ts_inv2;
-
+std::cout << "enter calcFeasibilityCost2"<< std::endl;
       //cout << "temp_a * ai=" ;
       for (int j = 0; j < 3; j++)
       {
@@ -1411,7 +1503,7 @@ namespace ego_planner
     cps_ = control_points;
 
     bool flag_success = rebound_optimize(final_cost);
-
+    std::cout << "END rebound_optimize" << std::endl;
     optimal_points = cps_.points;
 
     return flag_success;
@@ -1436,6 +1528,7 @@ namespace ego_planner
     int start_id = order_;
     // int end_id = this->cps_.size - order_; //Fixed end
     int end_id = this->cps_.size; // Free end
+    // std::cout << "before iter: " <<  start_id << "; " << end_id <<std::endl;
     variable_num_ = 3 * (end_id - start_id);
 
     ros::Time t0 = ros::Time::now(), t1, t2;
@@ -1444,6 +1537,8 @@ namespace ego_planner
     bool flag_force_return, flag_occ, success;
     new_lambda2_ = lambda2_;
     constexpr int MAX_RESART_NUMS_SET = 3;
+
+   // given below is iterative optimization process
     do
     {
       /* ---------- prepare ---------- */
@@ -1455,142 +1550,186 @@ namespace ego_planner
       success = false;
 
       double q[variable_num_];
+      // FIXME how to know cps_ belong to which object????
+      // std::cout << "before iter" << std::endl;
+      // std::cout << cps_.points<<  std::endl;
+      // std::cout << cps_.points.size()<< ", "<< variable_num_  << std::endl;
+      // std::cout << cps_.points.size()<< ", "<< variable_num_ * sizeof(q[0]) << std::endl;
       memcpy(q, cps_.points.data() + 3 * start_id, variable_num_ * sizeof(q[0]));
 
+
+      // std::cout << "Array q:\n";
+      // for (int i = 0; i < variable_num_; ++i) {
+      //     std::cout << "q[" << i << "] = " << q[i] << "\n";
+      // }
+
+      // std::cout << "Array size: " << sizeof(q) / sizeof(q[0]) << "\n";
+      // std::cout << "after memcpy" << std::endl;
+      
       lbfgs::lbfgs_parameter_t lbfgs_params;
       lbfgs::lbfgs_load_default_parameters(&lbfgs_params);
       lbfgs_params.mem_size = 16;
       lbfgs_params.max_iterations = 200;
       lbfgs_params.g_epsilon = 0.01;
+      // lbfgs_params.min_step = 0.000001;
 
       /* ---------- optimize ---------- */
       t1 = ros::Time::now();
+      // TOSEE lbfgs optimizer
+      // q=[x1,y1,z1;x2,y2,z2] q 是一个指向变量数组的指针，表示优化的初始变量值，并在优化过程中保存最终的优化结果。
+      // variable_num_ 是变量的数量，表示要优化的参数数量。
+
+      // std::cout << "before lbfgs_optimize" << std::endl;
       int result = lbfgs::lbfgs_optimize(variable_num_, q, &final_cost, BsplineOptimizer::costFunctionRebound, NULL, BsplineOptimizer::earlyExit, this, &lbfgs_params);
+      // std::cout << "after lbfgs_optimize" << std::endl;
+      std::cout << "itera num " << iter_num_ << std::endl;
+      std::cout << "lbfgs_optimize-------result " << result << std::endl;
       t2 = ros::Time::now();
       double time_ms = (t2 - t1).toSec() * 1000;
       double total_time_ms = (t2 - t0).toSec() * 1000;
 
-      /* ---------- success temporary, check collision again ---------- */
-      if (result == lbfgs::LBFGS_CONVERGENCE ||
-          result == lbfgs::LBFGSERR_MAXIMUMITERATION ||
-          result == lbfgs::LBFGS_ALREADY_MINIMIZED ||
-          result == lbfgs::LBFGS_STOP)
-      {
-        //ROS_WARN("Solver error in planning!, return = %s", lbfgs::lbfgs_strerror(result));
-        flag_force_return = false;
 
-        /*** collision check, phase 1 ***/
-        if ((min_ellip_dist_ != INIT_min_ellip_dist_) && (min_ellip_dist_ > swarm_clearance_))
-        {
-          success = false;
-          restart_nums++;
-          initControlPoints(cps_.points, false);
-          new_lambda2_ *= 2;
 
-          printf("\033[32miter(+1)=%d,time(ms)=%5.3f, swarm too close, keep optimizing\n\033[0m", iter_num_, time_ms);
 
-          continue;
-        }
 
-        /*** collision check, phase 2 ***/
-        UniformBspline traj = UniformBspline(cps_.points, 3, bspline_interval_);
-        double tm, tmp;
-        traj.getTimeSpan(tm, tmp);
-        double t_step = (tmp - tm) / ((traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm)).norm() / grid_map_->getResolution());
-        for (double t = tm; t < tmp * 2 / 3; t += t_step) // Only check the closest 2/3 partition of the whole trajectory.
-        {
-          flag_occ = grid_map_->getInflateOccupancy(traj.evaluateDeBoorT(t));
-          if (flag_occ)
-          {
-            //cout << "hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
 
-            if (t <= bspline_interval_) // First 3 control points in obstacles!
-            {
-              // cout << cps_.points.col(1).transpose() << "\n"
-              //      << cps_.points.col(2).transpose() << "\n"
-              //      << cps_.points.col(3).transpose() << "\n"
-              //      << cps_.points.col(4).transpose() << endl;
-              ROS_WARN("First 3 control points in obstacles! return false, t=%f", t);
-              return false;
-            }
 
-            break;
-          }
-        }
+//       /* ---------- success temporary, check collision again ---------- */
+//       if (result == lbfgs::LBFGS_CONVERGENCE ||
+//           result == lbfgs::LBFGSERR_MAXIMUMITERATION ||
+//           result == lbfgs::LBFGS_ALREADY_MINIMIZED ||
+//           result == lbfgs::LBFGS_STOP)
+//       {
+//         //ROS_WARN("Solver error in planning!, return = %s", lbfgs::lbfgs_strerror(result));
+//         flag_force_return = false;
 
-        // cout << "XXXXXX" << ((cps_.points.col(cps_.points.cols()-1) + 4*cps_.points.col(cps_.points.cols()-2) + cps_.points.col(cps_.points.cols()-3))/6 - local_target_pt_).norm() << endl;
+//         /*** collision check, phase 1 ***/
+//         if ((min_ellip_dist_ != INIT_min_ellip_dist_) && (min_ellip_dist_ > swarm_clearance_))
+//         {
+//           success = false;
+//           restart_nums++;
+//           std::cout<<"collision check, phase 1 "<<std::endl;
+//           initControlPoints(cps_.points, false);
+//           new_lambda2_ *= 2;
 
-        /*** collision check, phase 3 ***/
-//#define USE_SECOND_CLEARENCE_CHECK
-#ifdef USE_SECOND_CLEARENCE_CHECK
-        bool flag_cls_xyp, flag_cls_xyn, flag_cls_zp, flag_cls_zn;
-        Eigen::Vector3d start_end_vec = traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm);
-        Eigen::Vector3d offset_xy(-start_end_vec(0), start_end_vec(1), 0);
-        offset_xy.normalize();
-        Eigen::Vector3d offset_z = start_end_vec.cross(offset_xy);
-        offset_z.normalize();
-        offset_xy *= cps_.clearance / 2;
-        offset_z *= cps_.clearance / 2;
+//           printf("\033[32miter(+1)=%d,time(ms)=%5.3f, swarm too close, keep optimizing\n\033[0m", iter_num_, time_ms);
 
-        Eigen::MatrixXd check_pts(cps_.points.rows(), cps_.points.cols());
-        for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
-        {
-          check_pts.col(i) = cps_.points.col(i);
-          check_pts(0, i) += offset_xy(0);
-          check_pts(1, i) += offset_xy(1);
-          check_pts(2, i) += offset_xy(2);
-        }
-        flag_cls_xyp = initControlPoints(check_pts, false).size() > 0;
-        for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
-        {
-          check_pts(0, i) -= 2 * offset_xy(0);
-          check_pts(1, i) -= 2 * offset_xy(1);
-          check_pts(2, i) -= 2 * offset_xy(2);
-        }
-        flag_cls_xyn = initControlPoints(check_pts, false).size() > 0;
-        for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
-        {
-          check_pts(0, i) += offset_xy(0) + offset_z(0);
-          check_pts(1, i) += offset_xy(1) + offset_z(1);
-          check_pts(2, i) += offset_xy(2) + offset_z(2);
-        }
-        flag_cls_zp = initControlPoints(check_pts, false).size() > 0;
-        for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
-        {
-          check_pts(0, i) -= 2 * offset_z(0);
-          check_pts(1, i) -= 2 * offset_z(1);
-          check_pts(2, i) -= 2 * offset_z(2);
-        }
-        flag_cls_zn = initControlPoints(check_pts, false).size() > 0;
-        if ((flag_cls_xyp ^ flag_cls_xyn) || (flag_cls_zp ^ flag_cls_zn))
-          flag_occ = true;
-#endif
+//           continue;
+//         }
 
-        if (!flag_occ)
-        {
-          printf("\033[32miter(+1)=%d,time(ms)=%5.3f,total_t(ms)=%5.3f,cost=%5.3f\n\033[0m", iter_num_, time_ms, total_time_ms, final_cost);
-          success = true;
-        }
-        else // restart
-        {
-          restart_nums++;
-          initControlPoints(cps_.points, false);
-          new_lambda2_ *= 2;
+//         /*** collision check, phase 2 ***/
+//         UniformBspline traj = UniformBspline(cps_.points, 3, bspline_interval_);
+//         double tm, tmp;
+//         traj.getTimeSpan(tm, tmp);
+// std::cout<<"collision check, phase 22222 "<<std::endl;
+//         double t_step = (tmp - tm) / ((traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm)).norm() / grid_map_->getResolution());
+// std::cout<<"collision check, phase 2222222 "<<std::endl;
+//         for (double t = tm; t < tmp * 2 / 3; t += t_step) // Only check the closest 2/3 partition of the whole trajectory.
+//         {
+//           std::cout<<"collision check, phase 1111 "<<std::endl;
+//           flag_occ = grid_map_->getInflateOccupancy(traj.evaluateDeBoorT(t));
+//           if (flag_occ)
+//           {
+//             //cout << "hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
 
-          printf("\033[32miter(+1)=%d,time(ms)=%5.3f, collided, keep optimizing\n\033[0m", iter_num_, time_ms);
-        }
-      }
-      else if (result == lbfgs::LBFGSERR_CANCELED)
-      {
-        flag_force_return = true;
-        rebound_times++;
-        cout << "iter=" << iter_num_ << ",time(ms)=" << time_ms << ",rebound." << endl;
-      }
-      else
-      {
-        ROS_WARN("Solver error. Return = %d, %s. Skip this planning.", result, lbfgs::lbfgs_strerror(result));
-        // while (ros::ok());
-      }
+//             if (t <= bspline_interval_) // First 3 control points in obstacles!
+//             {
+//               // cout << cps_.points.col(1).transpose() << "\n"
+//               //      << cps_.points.col(2).transpose() << "\n"
+//               //      << cps_.points.col(3).transpose() << "\n"
+//               //      << cps_.points.col(4).transpose() << endl;
+//               ROS_WARN("First 3 control points in obstacles! return false, t=%f", t);
+//               return false;
+//             }
+
+//             break;
+//           }
+//         }
+
+//         // cout << "XXXXXX" << ((cps_.points.col(cps_.points.cols()-1) + 4*cps_.points.col(cps_.points.cols()-2) + cps_.points.col(cps_.points.cols()-3))/6 - local_target_pt_).norm() << endl;
+
+//         /*** collision check, phase 3 ***/
+// //#define USE_SECOND_CLEARENCE_CHECK
+// #ifdef USE_SECOND_CLEARENCE_CHECK
+//         bool flag_cls_xyp, flag_cls_xyn, flag_cls_zp, flag_cls_zn;
+//         Eigen::Vector3d start_end_vec = traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm);
+//         Eigen::Vector3d offset_xy(-start_end_vec(0), start_end_vec(1), 0);
+//         offset_xy.normalize();
+//         Eigen::Vector3d offset_z = start_end_vec.cross(offset_xy);
+//         offset_z.normalize();
+//         offset_xy *= cps_.clearance / 2;
+//         offset_z *= cps_.clearance / 2;
+
+//         Eigen::MatrixXd check_pts(cps_.points.rows(), cps_.points.cols());
+//         for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
+//         {
+//           check_pts.col(i) = cps_.points.col(i);
+//           check_pts(0, i) += offset_xy(0);
+//           check_pts(1, i) += offset_xy(1);
+//           check_pts(2, i) += offset_xy(2);
+//         }
+//         flag_cls_xyp = initControlPoints(check_pts, false).size() > 0;
+//         for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
+//         {
+//           check_pts(0, i) -= 2 * offset_xy(0);
+//           check_pts(1, i) -= 2 * offset_xy(1);
+//           check_pts(2, i) -= 2 * offset_xy(2);
+//         }
+//         flag_cls_xyn = initControlPoints(check_pts, false).size() > 0;
+//         for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
+//         {
+//           check_pts(0, i) += offset_xy(0) + offset_z(0);
+//           check_pts(1, i) += offset_xy(1) + offset_z(1);
+//           check_pts(2, i) += offset_xy(2) + offset_z(2);
+//         }
+//         flag_cls_zp = initControlPoints(check_pts, false).size() > 0;
+//         for (Eigen::Index i = 0; i < cps_.points.cols(); i++)
+//         {
+//           check_pts(0, i) -= 2 * offset_z(0);
+//           check_pts(1, i) -= 2 * offset_z(1);
+//           check_pts(2, i) -= 2 * offset_z(2);
+//         }
+//         flag_cls_zn = initControlPoints(check_pts, false).size() > 0;
+//         if ((flag_cls_xyp ^ flag_cls_xyn) || (flag_cls_zp ^ flag_cls_zn))
+//           flag_occ = true;
+// #endif
+
+//         if (!flag_occ)
+//         {
+//           std::cout<<"flag_occ "<<std::endl;
+//           printf("\033[32miter(+1)=%d,time(ms)=%5.3f,total_t(ms)=%5.3f,cost=%5.3f\n\033[0m", iter_num_, time_ms, total_time_ms, final_cost);
+//           success = true;
+//         }
+//         else // restart
+//         {
+//           restart_nums++;
+//           std::cout<<"collision check, phase 1 "<<std::endl;
+//           initControlPoints(cps_.points, false);
+//           new_lambda2_ *= 2;
+
+//           printf("\033[32miter(+1)=%d,time(ms)=%5.3f, collided, keep optimizing\n\033[0m", iter_num_, time_ms);
+//         }
+//       }
+//       else if (result == lbfgs::LBFGSERR_CANCELED)
+//       {
+//         flag_force_return = true;
+//         rebound_times++;
+//         cout << "iter=" << iter_num_ << ",time(ms)=" << time_ms << ",rebound." << endl;
+//       }
+//       else
+// // // //       {
+// // // //         ROS_WARN("Solver error. Return = %d, %s. Skip this planning.", result, lbfgs::lbfgs_strerror(result));
+// // // //         // while (ros::ok());
+// // // //       }
+
+
+
+
+
+
+
+
+      // std::cout<<"do while once time" << std::endl;
 
     } while (
         ((flag_occ || ((min_ellip_dist_ != INIT_min_ellip_dist_) && (min_ellip_dist_ > swarm_clearance_))) && restart_nums < MAX_RESART_NUMS_SET) ||
@@ -1669,13 +1808,22 @@ namespace ego_planner
     return flag_safe;
   }
 
+  // rebound function
+  // x is q including all the ctl pts
+  // grad only recalculated and updated at the end
   void BsplineOptimizer::combineCostRebound(const double *x, double *grad, double &f_combine, const int n)
   {
     // cout << "drone_id_=" << drone_id_ << endl;
     // cout << "cps_.points.size()=" << cps_.points.size() << endl;
     // cout << "n=" << n << endl;
     // cout << "sizeof(x[0])=" << sizeof(x[0]) << endl;
-
+std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
+// std::cout << "order:"<< order_ << std::endl;
+// std::cout << "x[0]:"<< x[0] << std::endl;
+// std::cout << "n:"<< n << std::endl;
+// std::cout << "ctl pts:"<<cps_.points  << std::endl;
+    // 这行代码的作用是将从 x 数组中的数据复制到 cps_.points 数据中的特定位置，从偏移位置开始，复制 n 个元素的数据。
+    // FIXME the below centence i don't know what is its meaning
     memcpy(cps_.points.data() + 3 * order_, x, n * sizeof(x[0]));
 
     /* ---------- evaluate cost and gradient ---------- */
@@ -1688,22 +1836,43 @@ namespace ego_planner
     Eigen::MatrixXd g_swarm = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_terminal = Eigen::MatrixXd::Zero(3, cps_.size);
 
+    // g means gradient
+    // we need calcSmoothnessCost calcDistanceCostRebound calcFeasibilityCost calcSwarmCost() calcTerminalCost(add lane center)
+// std::cout << "enter calcSmoothnessCost"<< std::endl;
     calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
-    calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
-    calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
+//  std::cout << "enter calcDistanceCostRebound"<< std::endl;   
+    // calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
+// std::cout << "enter combineCostRebound3"<< std::endl;
+    // feasibilitycost means maxmin vel or acc limitation
+    // calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
+// std::cout << "enter combineCostRebound4"<< std::endl;
     // calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
-    calcSwarmCost(cps_.points, f_swarm, g_swarm);
-    calcTerminalCost(cps_.points, f_terminal, g_terminal);
 
-    f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_swarm + lambda2_ * f_terminal;
+    // this is what attracking field 
+    // calcSwarmCost(cps_.points, f_swarm, g_swarm);
+// std::cout << "enter combineCostRebound5"<< std::endl;
+
+    calcSwarmCost_new(cps_.points, f_swarm, g_swarm);
+
+    // tend to the last 3 ctl pts 
+    // calcTerminalCost(cps_.points, f_terminal, g_terminal);
+
+    f_combine =f_swarm;
+    std::cout<<"f_combine:"<<f_combine<<endl;
+    // f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_swarm + lambda2_ * f_terminal;
     //f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_mov_objs;
     //printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
-    Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
+    Eigen::MatrixXd grad_3D = g_swarm;
+    grad_3D.row(2) = Eigen::RowVectorXd::Zero(grad_3D.cols());
+    std::cout << " swarm cost gradient:"<< std::endl;
+    std::cout<<grad_3D<<std::endl;
+    // Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
     //Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_mov_objs;
     memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
   }
 
+  // refine function 
   void BsplineOptimizer::combineCostRefine(const double *x, double *grad, double &f_combine, const int n)
   {
 

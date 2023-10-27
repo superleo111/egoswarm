@@ -760,6 +760,7 @@ namespace ego_planner
     bool plan_and_refine_success =
         planner_manager_->reboundReplan(start_pt_, start_vel_, start_acc_, local_target_pt_, local_target_vel_, (have_new_target_ || flag_use_poly_init), flag_randomPolyTraj);
     have_new_target_ = false;
+    // TOSEE rebound replan
 
     cout << "refine_success=" << plan_and_refine_success << endl;
 

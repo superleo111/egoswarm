@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(bspline_opt)
+# package name
 
 set(CMAKE_BUILD_TYPE "Release")
 ADD_COMPILE_OPTIONS(-std=c++11 )
@@ -42,4 +43,10 @@ add_library( bspline_opt
     )
 target_link_libraries( bspline_opt
     ${catkin_LIBRARIES} 
+    )  
+
+add_executable(test_bspline src/test.cpp)
+target_link_libraries(test_bspline
+    ${catkin_LIBRARIES} 
+    bspline_opt
     )  

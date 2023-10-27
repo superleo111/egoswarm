@@ -224,6 +224,7 @@ namespace ego_planner
     ros::Time start_time_;
     Eigen::Vector3d start_pos_;
     UniformBspline position_traj_;
+    double probability_;
   };
 
   typedef std::vector<OneTrajDataOfSwarm> SwarmTrajData;
