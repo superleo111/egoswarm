@@ -809,6 +809,7 @@ namespace ego_planner
           // std::cout << "continue" << std::endl;  
           continue;
         }
+        
 
         // FIXME evaluateDeBoorT(i*0.5) 函数返回在B样条曲线上参数值为u时的点
         Eigen::Vector3d swarm_prid = swarm_trajs_->at(id).position_traj_.evaluateDeBoorT((i-1)*0.5);
