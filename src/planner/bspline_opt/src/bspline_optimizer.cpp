@@ -786,7 +786,8 @@ namespace ego_planner
   void BsplineOptimizer::calcSwarmCost_new(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
   {
     cost = 0.0;
-    int end_idx = q.cols() - order_;
+    // int end_idx = q.cols() - order_;
+    int end_idx = q.cols();
     // double t_now = ros::Time::now().toSec();
     std::cout<<"q:"<<endl;
     std::cout << q << std::endl;
@@ -795,7 +796,7 @@ namespace ego_planner
     // std::cout << q.col(1) << std::endl;   
     // std::cout << "end_idx: "<< end_idx << std::endl;  
     // FIXME i should correspond to time layer
-    for (int i = order_; i < end_idx; i++)
+    for (int i = 0; i < end_idx; i++)
     {
 
       for (size_t id = 0; id < swarm_trajs_->size(); id++)
@@ -815,17 +816,18 @@ namespace ego_planner
 
         Eigen::Vector3d dist_vec = swarm_prid - cps_.points.col(i);
         double distance = dist_vec.squaredNorm();
-        cost += swarm_trajs_->at(id).probability_ * distance;
+        cost += swarm_trajs_->at(id).probability_ * distance / (i+1) / (i+1) ;
+        gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / (i+1) / (i+1);  
         
-        gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec);  
-        std::cout << "swarmprid:\n"<<swarm_prid<< std::endl;  
-        
-        std::cout << "prob:"<<swarm_trajs_->at(id).probability_<< std::endl;  
-        std::cout << "cps pts col:\n"<<cps_.points.col(i)<< std::endl;  
-        std::cout<< "distance:\n"<<distance<<std::endl;
-        std::cout<<"dis vect\n"<<dist_vec <<std::endl;
-        std::cout<<"norm\n"<<dist_vec.normalized() <<std::endl;
-        std::cout<<"gradient:\n"<<gradient<<endl;
+        // std::cout << "swarmprid:\n"<<swarm_prid<< std::endl;  
+        // std::cout << "prob:"<<swarm_trajs_->at(id).probability_<< std::endl;  
+        // std::cout << "cps pts col:\n"<<cps_.points.col(i)<< std::endl;  
+        // std::cout<< "distance:"<<distance<<std::endl;
+        // std::cout<< "i:"<<i<<std::endl;
+        // std::cout<<"cost:"<<cost<<std::endl;
+        // std::cout<<"dis vect\n"<<dist_vec <<std::endl;
+        // std::cout<<"norm\n"<<dist_vec.normalized() <<std::endl;
+        // std::cout<<"gradient:\n"<<gradient<<endl;
 
 
       }
@@ -1856,14 +1858,17 @@ std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
 
     // tend to the last 3 ctl pts 
     // calcTerminalCost(cps_.points, f_terminal, g_terminal);
-
-    f_combine =f_swarm;
+    double weigh_smoothness = 0.2;
+    double weith_swarmcost =0.8;
+    f_combine = weigh_smoothness * f_smoothness + weith_swarmcost * f_swarm;
+    std::cout<<"f_smoothness:"<<f_smoothness<<endl;
+    std::cout<<"f_swarm:"<<f_swarm<<endl;
     std::cout<<"f_combine:"<<f_combine<<endl;
     // f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_swarm + lambda2_ * f_terminal;
     //f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_mov_objs;
     //printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
-    Eigen::MatrixXd grad_3D = g_swarm;
+    Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weith_swarmcost * g_swarm;
     grad_3D.row(2) = Eigen::RowVectorXd::Zero(grad_3D.cols());
     std::cout << " swarm cost gradient:"<< std::endl;
     std::cout<<grad_3D<<std::endl;

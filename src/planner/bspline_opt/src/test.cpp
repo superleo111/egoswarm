@@ -264,12 +264,37 @@ int main(int argc, char **argv)
     vis_all_paths.push_back(vis_path);
     std::cout<<"vis size: "<<vis_path.size()<<endl;
 
+    vis_path.clear();
+    for (int i=0;i<traj_pts1.cols();i++)
+    {
+        a = traj_pts1.col(i);
+        vis_path.push_back(a);
+    }
+    vis_all_paths.push_back(vis_path);
+    std::cout<<"vis size: "<<vis_path.size()<<endl;
+
+    vis_path.clear();
+    for (int i=0;i<traj_pts2.cols();i++)
+    {
+        a = traj_pts2.col(i);
+        vis_path.push_back(a);
+    }
+    vis_all_paths.push_back(vis_path);
+    std::cout<<"vis size: "<<vis_path.size()<<endl;
+
+    vis_path.clear();
+    for (int i=0;i<traj_pts3.cols();i++)
+    {
+        a = traj_pts3.col(i);
+        vis_path.push_back(a);
+    }
+    vis_all_paths.push_back(vis_path);
+    std::cout<<"vis size: "<<vis_path.size()<<endl;
 
 
-
-    vis_all_paths.push_back(vectorList1);
-    vis_all_paths.push_back(vectorList2);
-    vis_all_paths.push_back(vectorList3);
+    // vis_all_paths.push_back(vectorList1);
+    // vis_all_paths.push_back(vectorList2);
+    // vis_all_paths.push_back(vectorList3);
     std::cout<<"vis size: "<<vis_all_paths.size()<<endl;
     VisOptTrajs(vis_all_paths, vis_opt_trajs);
 
