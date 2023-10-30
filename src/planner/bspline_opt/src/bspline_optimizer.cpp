@@ -789,8 +789,8 @@ namespace ego_planner
     // int end_idx = q.cols() - order_;
     int end_idx = q.cols();
     // double t_now = ros::Time::now().toSec();
-    std::cout<<"q:"<<endl;
-    std::cout << q << std::endl;
+    // std::cout<<"q:"<<endl;
+    // std::cout << q << std::endl;
     // std::cout << q.cols() << std::endl;
     // std::cout << q.col(0) << std::endl;
     // std::cout << q.col(1) << std::endl;   
@@ -801,8 +801,8 @@ namespace ego_planner
 
       for (size_t id = 0; id < swarm_trajs_->size(); id++)
       {
-        std::cout << "swarm_trajs_ drone_id:" << swarm_trajs_->at(id).drone_id<< std::endl;  
-        std::cout << "drone_id:" << drone_id_<< std::endl;  
+        // std::cout << "swarm_trajs_ drone_id:" << swarm_trajs_->at(id).drone_id<< std::endl;  
+        // std::cout << "drone_id:" << drone_id_<< std::endl;  
 
         if ((swarm_trajs_->at(id).drone_id != (int)id) || swarm_trajs_->at(id).drone_id == drone_id_)
         {
@@ -1203,7 +1203,6 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
     }
 
 #else
-std::cout << "enter calcFeasibilityCost0"<< std::endl;
     cost = 0.0;
     /* abbreviation */
     double ts, /*vm2, am2, */ ts_inv2;
@@ -1212,29 +1211,26 @@ std::cout << "enter calcFeasibilityCost0"<< std::endl;
 
     ts = bspline_interval_;
     ts_inv2 = 1 / ts / ts;
-std::cout << "enter calcFeasibilityCost01"<< std::endl;
+    // FIXME  adjust this value
+    max_vel_ = 10;
+    max_acc_ = 2;
+
+
     /* velocity feasibility */
     for (int i = 0; i < q.cols() - 1; i++)
     {
-      std::cout << "enter calcFeasibilityCost02"<< std::endl;
-      std::cout << q << std::endl;
-      std::cout << q.cols() << std::endl;
-      std::cout << q.col(0) << std::endl;
-      std::cout << q.col(1) << std::endl;
       Eigen::Vector3d vi = (q.col(i + 1) - q.col(i)) / ts;
-      // error here
-
-
-
-std::cout << "enter calcFeasibilityCost1"<< std::endl;
       //cout << "temp_v * vi=" ;
       for (int j = 0; j < 3; j++)
       {
+        // max_vel_ equal to ????where assigns a value to it????
         if (vi(j) > max_vel_)
         {
           // cout << "zx-todo VEL" << endl;
           // cout << vi(j) << endl;
-          cost += pow(vi(j) - max_vel_, 2) * ts_inv2; // multiply ts_inv3 to make vel and acc has similar magnitude
+
+          // multiply ts_inv2 to make vel and acc cost has similar magnitude
+          cost += pow(vi(j) - max_vel_, 2) * ts_inv2; 
 
           gradient(j, i + 0) += -2 * (vi(j) - max_vel_) / ts * ts_inv2;
           gradient(j, i + 1) += 2 * (vi(j) - max_vel_) / ts * ts_inv2;
@@ -1257,7 +1253,7 @@ std::cout << "enter calcFeasibilityCost1"<< std::endl;
     for (int i = 0; i < q.cols() - 2; i++)
     {
       Eigen::Vector3d ai = (q.col(i + 2) - 2 * q.col(i + 1) + q.col(i)) * ts_inv2;
-std::cout << "enter calcFeasibilityCost2"<< std::endl;
+      
       //cout << "temp_a * ai=" ;
       for (int j = 0; j < 3; j++)
       {
@@ -1847,7 +1843,7 @@ std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
     // calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
 // std::cout << "enter combineCostRebound3"<< std::endl;
     // feasibilitycost means maxmin vel or acc limitation
-    // calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
+    calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
 // std::cout << "enter combineCostRebound4"<< std::endl;
     // calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
 
@@ -1860,18 +1856,21 @@ std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
     // tend to the last 3 ctl pts 
     // calcTerminalCost(cps_.points, f_terminal, g_terminal);
     double weigh_smoothness = 0.2;
-    double weith_swarmcost =0.8;
-    f_combine = weigh_smoothness * f_smoothness + weith_swarmcost * f_swarm;
-    std::cout<<"f_smoothness:"<<f_smoothness<<endl;
-    std::cout<<"f_swarm:"<<f_swarm<<endl;
+    double weigh_swarmcost = 0.6;
+    double weigh_feasibility = 0.2;
+    f_combine = weigh_smoothness * f_smoothness + weigh_swarmcost * f_swarm + weigh_feasibility * f_feasibility;
+    // f_combine = f_feasibility;
+    // std::cout<<"f_smoothness:"<<f_smoothness<<endl;
+    // std::cout<<"f_swarm:"<<f_swarm<<endl;
     std::cout<<"f_combine:"<<f_combine<<endl;
     // f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_swarm + lambda2_ * f_terminal;
     //f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_mov_objs;
     //printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
-    Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weith_swarmcost * g_swarm;
+    Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weigh_swarmcost * g_swarm + weigh_feasibility * g_feasibility;
+    // Eigen::MatrixXd grad_3D = g_feasibility;
     grad_3D.row(2) = Eigen::RowVectorXd::Zero(grad_3D.cols());
-    std::cout << " swarm cost gradient:"<< std::endl;
+    std::cout << " gradient 3D:"<< std::endl;
     std::cout<<grad_3D<<std::endl;
     // Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
     //Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_mov_objs;

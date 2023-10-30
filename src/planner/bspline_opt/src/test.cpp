@@ -212,9 +212,7 @@ int main(int argc, char **argv)
     std::cout << "traj_pts3:" << std::endl;
     std::cout << traj_pts3 << std::endl;
 
-    ControlPoints traj;
-    traj.points = traj_pts1;
-    traj.size = traj_pts1.cols();
+
 
 
     int order = 3;
@@ -244,9 +242,12 @@ int main(int argc, char **argv)
     bspline_optimizer_->setOrder(3);
     bspline_optimizer_->setBsplineInterval(0.5);
 
-    // can be modified param 
-    bspline_optimizer_->setDroneId(0);
-    bspline_optimizer_->setControlPoints(traj_pts1);
+    // FIXME can be modified param 
+    bspline_optimizer_->setDroneId(2);
+    bspline_optimizer_->setControlPoints(traj_pts3);
+    ControlPoints traj;
+    traj.points = traj_pts3;
+    traj.size = traj_pts3.cols();
 
     bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts_temp, final_cost, traj, ts);
     std::cout << "final cost: " << final_cost << endl;
