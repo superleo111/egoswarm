@@ -44,7 +44,17 @@ void VisOptTrajs(const std::vector<std::vector<Eigen::Vector3d>> &vis_all_paths,
         marker.color.r = (double)rand() / RAND_MAX;
         marker.color.g = (double)rand() / RAND_MAX;
         marker.color.b = (double)rand() / RAND_MAX;
-        marker.color.a = 1.0;
+        marker.color.a = 0.5;
+        if (i>2){marker.color.a=1.0;}
+        if (i==3) {        marker.color.r = 1;
+        marker.color.g = 0;
+        marker.color.b = 0;}
+        if (i==4) {        marker.color.r = 1;
+        marker.color.g = 1;
+        marker.color.b = 1;}    
+        if (i==5) {        marker.color.r = 1;
+        marker.color.g = 0.6;
+        marker.color.b = 0.2;}      
 
         // Set the points for each path
         const std::vector<Eigen::Vector3d> &path_points = vis_all_paths[i];
@@ -62,9 +72,11 @@ void VisOptTrajs(const std::vector<std::vector<Eigen::Vector3d>> &vis_all_paths,
         visualization_msgs::Marker &new_marker = marker_array.markers[vis_all_paths.size() + i];
         new_marker.type = visualization_msgs::Marker::SPHERE_LIST;
         new_marker.id = vis_all_paths.size() + i;
-        new_marker.scale.x = 0.2;
-        new_marker.scale.y = 0.2;
-        new_marker.scale.z = 0.2;
+        new_marker.scale.x = 0.1;
+        new_marker.scale.y = 0.1;
+        new_marker.scale.z = 0.1;
+        new_marker.color.a = 0.5;
+        if (i>2){new_marker.color.a = 1;}
     }
     visualization_msgs::MarkerArray line_marker_array;
     auto res = Eigen::Vector3d(0.05, 0.05, 0.05);
@@ -100,8 +112,8 @@ int main(int argc, char **argv)
 
     std::cout << "test_bspline running" << std::endl;
     // init optimizer
-    BsplineOptimizer::Ptr bspline_optimizer_;
-    bspline_optimizer_.reset(new BsplineOptimizer);
+    // BsplineOptimizer::Ptr bspline_optimizer_;
+    // bspline_optimizer_.reset(new BsplineOptimizer);
 
 
     SwarmTrajData swarm_trajs_buf_; // std::vector<ego_planner::OneTrajDataOfSwarm>
@@ -117,6 +129,8 @@ int main(int argc, char **argv)
 
 
     std::vector<Eigen::Vector3d> vectorList1 = {Eigen::Vector3d(10.65,2.05,0),Eigen::Vector3d(13.55,2.15,0.5),Eigen::Vector3d(16.05,2.15,1),Eigen::Vector3d(18.05,2.25,1.5),Eigen::Vector3d(19.65,2.15,2),Eigen::Vector3d(20.85,2.15,2.5),Eigen::Vector3d(21.65,2.25,3),Eigen::Vector3d(22.15,2.35,3.5),Eigen::Vector3d(22.35,2.45,4),Eigen::Vector3d(22.35,2.55,4.5),Eigen::Vector3d(22.25,2.65,5),};    
+    // std::vector<Eigen::Vector3d> vectorList1 = {Eigen::Vector3d(18.05,2.25,1.5),Eigen::Vector3d(19.65,2.15,2),Eigen::Vector3d(20.85,2.15,2.5),Eigen::Vector3d(21.65,2.25,3),Eigen::Vector3d(22.15,2.35,3.5),Eigen::Vector3d(22.35,2.45,4),Eigen::Vector3d(22.35,2.55,4.5),Eigen::Vector3d(22.25,2.65,5),};    
+
     // Eigen::MatrixXd traj_pts1(3,vectorList1.size());
     // for (int i = 0; i < vectorList1.size(); i++) {
     //     traj_pts1.col(i) = vectorList1[i];
@@ -133,6 +147,8 @@ int main(int argc, char **argv)
     UniformBspline::parameterizeToBspline(ts, vectorList1, start_end_derivatives, traj_pts1);
 
     std::vector<Eigen::Vector3d> vectorList2 = {Eigen::Vector3d(10.65,2.05,0),Eigen::Vector3d(13.55,2.15,0.5),Eigen::Vector3d(16.15,2.15,1),Eigen::Vector3d(18.45,2.25,1.5),Eigen::Vector3d(20.75,2.15,2),Eigen::Vector3d(22.65,2.25,2.5),Eigen::Vector3d(24.25,2.55,3),Eigen::Vector3d(25.45,2.65,3.5),Eigen::Vector3d(26.35,2.85,4),Eigen::Vector3d(26.95,3.05,4.5),Eigen::Vector3d(27.45,3.35,5),};
+    // std::vector<Eigen::Vector3d> vectorList2 = {Eigen::Vector3d(18.45,2.25,1.5),Eigen::Vector3d(20.75,2.15,2),Eigen::Vector3d(22.65,2.25,2.5),Eigen::Vector3d(24.25,2.55,3),Eigen::Vector3d(25.45,2.65,3.5),Eigen::Vector3d(26.35,2.85,4),Eigen::Vector3d(26.95,3.05,4.5),Eigen::Vector3d(27.45,3.35,5),};
+ 
     // Eigen::MatrixXd traj_pts2(3,vectorList2.size());
     // for (int i = 0; i < vectorList2.size(); i++) {
     //     traj_pts2.col(i) = vectorList2[i];
@@ -144,6 +160,8 @@ int main(int argc, char **argv)
     UniformBspline::parameterizeToBspline(ts, vectorList2, start_end_derivatives, traj_pts2);
 
     std::vector<Eigen::Vector3d> vectorList3 = {Eigen::Vector3d(10.65,2.05,0),Eigen::Vector3d(13.75,2.15,0.5),Eigen::Vector3d(17.05,2.15,1),Eigen::Vector3d(20.75,2.25,1.5),Eigen::Vector3d(24.75,2.95,2),Eigen::Vector3d(28.85,4.75,2.5),Eigen::Vector3d(33.35,6.25,3),Eigen::Vector3d(38.45,5.35,3.5),Eigen::Vector3d(43.65,3.45,4),Eigen::Vector3d(49.25,2.65,4.5),Eigen::Vector3d(54.85,1.85,5),};
+    // std::vector<Eigen::Vector3d> vectorList3 = {Eigen::Vector3d(20.75,2.25,1.5),Eigen::Vector3d(24.75,2.95,2),Eigen::Vector3d(28.85,4.75,2.5),Eigen::Vector3d(33.35,6.25,3),Eigen::Vector3d(38.45,5.35,3.5),Eigen::Vector3d(43.65,3.45,4),Eigen::Vector3d(49.25,2.65,4.5),Eigen::Vector3d(54.85,1.85,5),};
+
     // Eigen::MatrixXd traj_pts3(3,vectorList3.size());
     // for (int i = 0; i < vectorList3.size(); i++) {
     //     traj_pts3.col(i) = vectorList3[i];
@@ -220,82 +238,157 @@ int main(int argc, char **argv)
 
     UniformBspline bspline1(traj_pts1, order, interval);
     one_traj1.position_traj_ = bspline1;
-    one_traj1.probability_ = 0.5;
+    one_traj1.probability_ = 0.1;
     one_traj1.drone_id = 0;
     swarm_trajs_buf_.push_back(one_traj1);
 
     UniformBspline bspline2(traj_pts2, order, interval);
     one_traj2.position_traj_ = bspline2;
-    one_traj2.probability_ = 0.3;
+    one_traj2.probability_ = 0.1;
     one_traj2.drone_id = 1;
     swarm_trajs_buf_.push_back(one_traj2);
 
     UniformBspline bspline3(traj_pts3, order, interval);
     one_traj3.position_traj_ = bspline3;
-    one_traj3.probability_ = 0.2;
+    one_traj3.probability_ = 0.8;
     one_traj3.drone_id = 2;
     swarm_trajs_buf_.push_back(one_traj3);
-
-
-
-    bspline_optimizer_->setSwarmTrajs(&swarm_trajs_buf_);
-    bspline_optimizer_->setOrder(3);
-    bspline_optimizer_->setBsplineInterval(0.5);
-
-    // FIXME can be modified param 
-    bspline_optimizer_->setDroneId(2);
-    bspline_optimizer_->setControlPoints(traj_pts3);
-    ControlPoints traj;
-    traj.points = traj_pts3;
-    traj.size = traj_pts3.cols();
-
-    bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts_temp, final_cost, traj, ts);
-    std::cout << "final cost: " << final_cost << endl;
-    std::cout<<"ctl pts:"<<endl;
-    std::cout << traj_pts1<<endl;
-    std::cout<<"result pts:"<<endl;
-    std::cout << ctrl_pts_temp<<endl;
-
-    vis_path.clear();
-    for (int i=0;i<ctrl_pts_temp.cols();i++)
-    {
-        a = ctrl_pts_temp.col(i);
-        vis_path.push_back(a);
-    }
-    vis_all_paths.push_back(vis_path);
-    std::cout<<"vis size: "<<vis_path.size()<<endl;
-
-    vis_path.clear();
-    for (int i=0;i<traj_pts1.cols();i++)
-    {
-        a = traj_pts1.col(i);
-        vis_path.push_back(a);
-    }
-    vis_all_paths.push_back(vis_path);
-    std::cout<<"vis size: "<<vis_path.size()<<endl;
-
-    vis_path.clear();
-    for (int i=0;i<traj_pts2.cols();i++)
-    {
-        a = traj_pts2.col(i);
-        vis_path.push_back(a);
-    }
-    vis_all_paths.push_back(vis_path);
-    std::cout<<"vis size: "<<vis_path.size()<<endl;
-
-    vis_path.clear();
-    for (int i=0;i<traj_pts3.cols();i++)
-    {
-        a = traj_pts3.col(i);
-        vis_path.push_back(a);
-    }
-    vis_all_paths.push_back(vis_path);
-    std::cout<<"vis size: "<<vis_path.size()<<endl;
-
 
     // vis_all_paths.push_back(vectorList1);
     // vis_all_paths.push_back(vectorList2);
     // vis_all_paths.push_back(vectorList3);
+
+    // code below : draw original bspline
+    Eigen::MatrixXd bspts = bspline1.get_control_points();
+    std::vector<Eigen::Vector3d> bs_vector1;
+    for (int i=0;i<bspts.cols();i++)
+    {
+        Eigen::Vector3d pts_colunm = bspts.col(i);
+        bs_vector1.push_back(pts_colunm);
+    }
+    vis_all_paths.push_back(bs_vector1);
+
+    bspts = bspline2.get_control_points();
+    std::vector<Eigen::Vector3d> bs_vector2;
+    for (int i=0;i<bspts.cols();i++)
+    {
+        Eigen::Vector3d pts_colunm = bspts.col(i);
+        bs_vector2.push_back(pts_colunm);
+    }
+    vis_all_paths.push_back(bs_vector2);
+
+    bspts = bspline3.get_control_points();
+    std::vector<Eigen::Vector3d> bs_vector3;
+    for (int i=0;i<bspts.cols();i++)
+    {
+        Eigen::Vector3d pts_colunm = bspts.col(i);
+        bs_vector3.push_back(pts_colunm);
+    }
+    vis_all_paths.push_back(bs_vector3);
+
+
+
+
+
+    // bspline_optimizer_->setSwarmTrajs(&swarm_trajs_buf_);
+    // bspline_optimizer_->setOrder(3);
+    // bspline_optimizer_->setBsplineInterval(0.5);
+
+    std::vector<Eigen::MatrixXd> trajs;
+    trajs.push_back(traj_pts1);
+    trajs.push_back(traj_pts2);
+    trajs.push_back(traj_pts3);
+
+    // int i =0;
+    for (int i=0;i<3;i++)
+    {
+        BsplineOptimizer::Ptr bspline_optimizer_;
+        bspline_optimizer_.reset(new BsplineOptimizer);
+
+        bspline_optimizer_->setSwarmTrajs(&swarm_trajs_buf_);
+        bspline_optimizer_->setOrder(3);
+        bspline_optimizer_->setBsplineInterval(0.5);
+
+
+        bspline_optimizer_->setDroneId(i);
+        bspline_optimizer_->setControlPoints(trajs[i]);
+        ControlPoints traj;
+        traj.points = trajs[i];
+        traj.size = trajs[i].cols();
+
+        bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts_temp, final_cost, traj, ts);
+        std::cout<<i<<" traj-------[opt end]"<<endl;
+        std::cout << "final cost: " << final_cost << endl;
+        std::cout<<"ctl pts:"<<endl;
+        // FIME remember modify this output to compare
+        std::cout << traj_pts1<<endl;
+        std::cout<<"result pts:"<<endl;
+        std::cout << ctrl_pts_temp<<endl;
+
+        std::vector<Eigen::Vector3d> opt_path;
+        for (int i=0;i<ctrl_pts_temp.cols();i++)
+        {
+            a = ctrl_pts_temp.col(i);
+            opt_path.push_back(a);
+        }
+        vis_all_paths.push_back(opt_path);
+        std::cout<<"vis size: "<<opt_path.size()<<endl;
+
+    }
+
+    // // FIXME can be modified param 
+    // bspline_optimizer_->setDroneId(0);
+    // bspline_optimizer_->setControlPoints(traj_pts1);
+    // ControlPoints traj;
+    // traj.points = traj_pts1;
+    // traj.size = traj_pts1.cols();
+
+    // bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts_temp, final_cost, traj, ts);
+    // std::cout << "final cost: " << final_cost << endl;
+    // std::cout<<"ctl pts:"<<endl;
+    // // FIME remember modify this output to compare
+    // std::cout << traj_pts1<<endl;
+    // std::cout<<"result pts:"<<endl;
+    // std::cout << ctrl_pts_temp<<endl;
+
+
+    // for (int i=0;i<ctrl_pts_temp.cols();i++)
+    // {
+    //     a = ctrl_pts_temp.col(i);
+    //     vis_path.push_back(a);
+    // }
+    // vis_all_paths.push_back(vis_path);
+    // std::cout<<"vis size: "<<vis_path.size()<<endl;
+
+    // vis_path.clear();
+    // for (int i=0;i<traj_pts1.cols();i++)
+    // {
+    //     a = traj_pts1.col(i);
+    //     vis_path.push_back(a);
+    // }
+    // vis_all_paths.push_back(vis_path);
+    // std::cout<<"vis size: "<<vis_path.size()<<endl;
+
+    // vis_path.clear();
+    // for (int i=0;i<traj_pts2.cols();i++)
+    // {
+    //     a = traj_pts2.col(i);
+    //     vis_path.push_back(a);
+    // }
+    // vis_all_paths.push_back(vis_path);
+    // std::cout<<"vis size: "<<vis_path.size()<<endl;
+
+    // vis_path.clear();
+    // for (int i=0;i<traj_pts3.cols();i++)
+    // {
+    //     a = traj_pts3.col(i);
+    //     vis_path.push_back(a);
+    // }
+    // vis_all_paths.push_back(vis_path);
+    // std::cout<<"vis size: "<<vis_path.size()<<endl;
+
+
+
     std::cout<<"vis size: "<<vis_all_paths.size()<<endl;
     VisOptTrajs(vis_all_paths, vis_opt_trajs);
 

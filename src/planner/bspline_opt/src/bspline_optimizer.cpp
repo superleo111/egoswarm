@@ -788,6 +788,7 @@ namespace ego_planner
     cost = 0.0;
     // int end_idx = q.cols() - order_;
     int end_idx = q.cols();
+    int start_idx = order_-1;
     // double t_now = ros::Time::now().toSec();
     // std::cout<<"q:"<<endl;
     // std::cout << q << std::endl;
@@ -796,7 +797,7 @@ namespace ego_planner
     // std::cout << q.col(1) << std::endl;   
     // std::cout << "end_idx: "<< end_idx << std::endl;  
     // FIXME i should correspond to time layer
-    for (int i = 0; i < end_idx; i++)
+    for (int i = start_idx; i < end_idx; i++)
     {
 
       for (size_t id = 0; id < swarm_trajs_->size(); id++)
@@ -804,21 +805,27 @@ namespace ego_planner
         // std::cout << "swarm_trajs_ drone_id:" << swarm_trajs_->at(id).drone_id<< std::endl;  
         // std::cout << "drone_id:" << drone_id_<< std::endl;  
 
-        if ((swarm_trajs_->at(id).drone_id != (int)id) || swarm_trajs_->at(id).drone_id == drone_id_)
+        if ((swarm_trajs_->at(id).drone_id != (int)id) )
         {
-          // std::cout << "continue" << std::endl;  
+          std::cout << "[ID ERROR] continue" << std::endl;  
           continue;
         }
         
 
         // FIXME evaluateDeBoorT(i*0.5) 函数返回在B样条曲线上参数值为u时的点
         Eigen::Vector3d swarm_prid = swarm_trajs_->at(id).position_traj_.evaluateDeBoorT((i-1)*0.5);
-
+        // if (i==0)
+        // {
+        //   std::cout<<"+++++++++++++++++++"<<endl;
+        //  // i=0--t=0  i=0--t=-0.5
+        //   std::cout<<swarm_trajs_->at(id).position_traj_.evaluateDeBoorT((i)*0.5)<<endl;
+        //   std::cout<<cps_.points.col(i+1)<<endl;
+        // }
 
         Eigen::Vector3d dist_vec = swarm_prid - cps_.points.col(i);
         double distance = dist_vec.squaredNorm();
-        cost += swarm_trajs_->at(id).probability_ * distance / (i+1) / (i+1) ;
-        gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / (i+1) / (i+1);  
+        cost += swarm_trajs_->at(id).probability_ * distance /pow(i,2) ;
+        gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / pow(i,2) * 50;  
         
         // std::cout << "swarmprid:\n"<<swarm_prid<< std::endl;  
         // std::cout << "prob:"<<swarm_trajs_->at(id).probability_<< std::endl;  
@@ -1524,7 +1531,7 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
   bool BsplineOptimizer::rebound_optimize(double &final_cost)
   {
     iter_num_ = 0;
-    int start_id = order_;
+    int start_id = order_-1;
     // int end_id = this->cps_.size - order_; //Fixed end
     int end_id = this->cps_.size; // Free end
     // std::cout << "before iter: " <<  start_id << "; " << end_id <<std::endl;
@@ -1556,11 +1563,11 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
       // std::cout << cps_.points.size()<< ", "<< variable_num_ * sizeof(q[0]) << std::endl;
       memcpy(q, cps_.points.data() + 3 * start_id, variable_num_ * sizeof(q[0]));
 
-
-      // std::cout << "Array q:\n";
-      // for (int i = 0; i < variable_num_; ++i) {
-      //     std::cout << "q[" << i << "] = " << q[i] << "\n";
-      // }
+      std::cout<<"order:"<<order_<<endl;
+      std::cout << "Array q:\n";
+      for (int i = 0; i < variable_num_; ++i) {
+          std::cout << "q[" << i << "] = " << q[i] << "\n";
+      }
 
       // std::cout << "Array size: " << sizeof(q) / sizeof(q[0]) << "\n";
       // std::cout << "after memcpy" << std::endl;
@@ -1728,7 +1735,16 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
 
 
 
-      // std::cout<<"do while once time" << std::endl;
+      // std::cout<<"flag_occ:"<<flag_occ << std::endl;
+      // std::cout<<"min_ellip_dist_:"<<min_ellip_dist_<<std::endl;
+      // std::cout<<"INIT_min_ellip_dist_"<<INIT_min_ellip_dist_<<std::endl;
+      // std::cout<<"swarm_clearance_"<<swarm_clearance_<<std::endl;
+      // std::cout<<"restart_nums"<<restart_nums<<std::endl;
+      // std::cout<<"MAX_RESART_NUMS_SET"<<MAX_RESART_NUMS_SET<<std::endl;
+      // std::cout<<"flag_force_return"<<flag_force_return<<std::endl;
+      // std::cout<<"force_stop_type_"<<force_stop_type_<<std::endl;
+      // std::cout<<"rebound_times"<<rebound_times<<std::endl;
+
 
     } while (
         ((flag_occ || ((min_ellip_dist_ != INIT_min_ellip_dist_) && (min_ellip_dist_ > swarm_clearance_))) && restart_nums < MAX_RESART_NUMS_SET) ||
@@ -1812,6 +1828,8 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
   // grad only recalculated and updated at the end
   void BsplineOptimizer::combineCostRebound(const double *x, double *grad, double &f_combine, const int n)
   {
+    int start_idx = order_ -1;
+    
     // cout << "drone_id_=" << drone_id_ << endl;
     // cout << "cps_.points.size()=" << cps_.points.size() << endl;
     // cout << "n=" << n << endl;
@@ -1823,7 +1841,12 @@ std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
 // std::cout << "ctl pts:"<<cps_.points  << std::endl;
     // 这行代码的作用是将从 x 数组中的数据复制到 cps_.points 数据中的特定位置，从偏移位置开始，复制 n 个元素的数据。
     // FIXME the below centence i don't know what is its meaning
-    memcpy(cps_.points.data() + 3 * order_, x, n * sizeof(x[0]));
+    // n=30
+    memcpy(cps_.points.data() + 3 * start_idx, x, n * sizeof(x[0]));
+    
+std::cout << "n="<<n<<endl;
+// std::cout << "ctl pts:"<< std::endl;
+// std::cout << cps_.points  << std::endl;
 
     /* ---------- evaluate cost and gradient ---------- */
     double f_smoothness, f_distance, f_feasibility /*, f_mov_objs*/, f_swarm, f_terminal;
@@ -1838,12 +1861,12 @@ std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
     // g means gradient
     // we need calcSmoothnessCost calcDistanceCostRebound calcFeasibilityCost calcSwarmCost() calcTerminalCost(add lane center)
 // std::cout << "enter calcSmoothnessCost"<< std::endl;
-    calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
+    // calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
 //  std::cout << "enter calcDistanceCostRebound"<< std::endl;   
     // calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
 // std::cout << "enter combineCostRebound3"<< std::endl;
     // feasibilitycost means maxmin vel or acc limitation
-    calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
+    // calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
 // std::cout << "enter combineCostRebound4"<< std::endl;
     // calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
 
@@ -1858,8 +1881,8 @@ std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
     double weigh_smoothness = 0.2;
     double weigh_swarmcost = 0.6;
     double weigh_feasibility = 0.2;
-    f_combine = weigh_smoothness * f_smoothness + weigh_swarmcost * f_swarm + weigh_feasibility * f_feasibility;
-    // f_combine = f_feasibility;
+    // f_combine = weigh_smoothness * f_smoothness + weigh_swarmcost * f_swarm + weigh_feasibility * f_feasibility;
+    f_combine = f_swarm;
     // std::cout<<"f_smoothness:"<<f_smoothness<<endl;
     // std::cout<<"f_swarm:"<<f_swarm<<endl;
     std::cout<<"f_combine:"<<f_combine<<endl;
@@ -1867,14 +1890,14 @@ std::cout << "[BEGIN COST CALC] enter combineCostRebound"<< std::endl;
     //f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_mov_objs;
     //printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
-    Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weigh_swarmcost * g_swarm + weigh_feasibility * g_feasibility;
-    // Eigen::MatrixXd grad_3D = g_feasibility;
+    // Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weigh_swarmcost * g_swarm + weigh_feasibility * g_feasibility;
+    Eigen::MatrixXd grad_3D = g_swarm;
     grad_3D.row(2) = Eigen::RowVectorXd::Zero(grad_3D.cols());
-    std::cout << " gradient 3D:"<< std::endl;
-    std::cout<<grad_3D<<std::endl;
+    // std::cout << " gradient 3D:"<< std::endl;
+    // std::cout<<grad_3D<<std::endl;
     // Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
     //Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_mov_objs;
-    memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
+    memcpy(grad, grad_3D.data() + 3 * start_idx, n * sizeof(grad[0]));
   }
 
   // refine function 
