@@ -1039,12 +1039,14 @@ namespace ego_planner
   {
 
     cost = 0.0;
+    int start_idx =order_-2;
+    int end_idx = q.cols() - 3;
 
     if (falg_use_jerk)
     {
       Eigen::Vector3d jerk, temp_j;
 
-      for (int i = 0; i < q.cols() - 3; i++)
+      for (int i = start_idx; i < end_idx; i++)
       {
         /* evaluate jerk 加速度的变化率 
         every q.col is a point, use 4 pts to calculate the derivative of acc
@@ -1229,6 +1231,8 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
 
 #else
     cost = 0.0;
+    int end_idx = q.cols()-2;
+    int start_idx = order_-2;//acc need to calc from t=0!
     /* abbreviation */
     double ts, /*vm2, am2, */ ts_inv2;
     // vm2 = max_vel_ * max_vel_;
@@ -1241,41 +1245,41 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
     max_acc_ = 3;
 
 
-    /* velocity feasibility */
-    for (int i = 0; i < q.cols() - 1; i++)
-    {
-      Eigen::Vector3d vi = (q.col(i + 1) - q.col(i)) / ts;
-      //cout << "temp_v * vi=" ;
-      for (int j = 0; j < 3; j++)
-      {
-        // max_vel_ equal to ????where assigns a value to it????
-        if (vi(j) > max_vel_)
-        {
-          // cout << "zx-todo VEL" << endl;
-          // cout << vi(j) << endl;
+    // /* velocity feasibility */
+    // for (int i = 0; i < q.cols() - 1; i++)
+    // {
+    //   Eigen::Vector3d vi = (q.col(i + 1) - q.col(i)) / ts;
+    //   //cout << "temp_v * vi=" ;
+    //   for (int j = 0; j < 3; j++)
+    //   {
+    //     // max_vel_ equal to ????where assigns a value to it????
+    //     if (vi(j) > max_vel_)
+    //     {
+    //       // cout << "zx-todo VEL" << endl;
+    //       // cout << vi(j) << endl;
 
-          // multiply ts_inv2 to make vel and acc cost has similar magnitude
-          cost += pow(vi(j) - max_vel_, 2) * ts_inv2; 
+    //       // multiply ts_inv2 to make vel and acc cost has similar magnitude
+    //       cost += pow(vi(j) - max_vel_, 2) * ts_inv2; 
 
-          gradient(j, i + 0) += -2 * (vi(j) - max_vel_) / ts * ts_inv2;
-          gradient(j, i + 1) += 2 * (vi(j) - max_vel_) / ts * ts_inv2;
-        }
-        else if (vi(j) < -max_vel_)
-        {
-          cost += pow(vi(j) + max_vel_, 2) * ts_inv2;
+    //       gradient(j, i + 0) += -2 * (vi(j) - max_vel_) / ts * ts_inv2;
+    //       gradient(j, i + 1) += 2 * (vi(j) - max_vel_) / ts * ts_inv2;
+    //     }
+    //     else if (vi(j) < -max_vel_)
+    //     {
+    //       cost += pow(vi(j) + max_vel_, 2) * ts_inv2;
 
-          gradient(j, i + 0) += -2 * (vi(j) + max_vel_) / ts * ts_inv2;
-          gradient(j, i + 1) += 2 * (vi(j) + max_vel_) / ts * ts_inv2;
-        }
-        else
-        {
-          /* code */
-        }
-      }
-    }
+    //       gradient(j, i + 0) += -2 * (vi(j) + max_vel_) / ts * ts_inv2;
+    //       gradient(j, i + 1) += 2 * (vi(j) + max_vel_) / ts * ts_inv2;
+    //     }
+    //     else
+    //     {
+    //       /* code */
+    //     }
+    //   }
+    // }
 
     /* acceleration feasibility */
-    for (int i = 0; i < q.cols() - 2; i++)
+    for (int i = start_idx; i < end_idx; i++)
     {
       Eigen::Vector3d ai = (q.col(i + 2) - 2 * q.col(i + 1) + q.col(i)) * ts_inv2;
       
@@ -1879,12 +1883,12 @@ std::cout << "n="<<n<<endl;
     // g means gradient
     // we need calcSmoothnessCost calcDistanceCostRebound calcFeasibilityCost calcSwarmCost() calcTerminalCost(add lane center)
 // std::cout << "enter calcSmoothnessCost"<< std::endl;
-    // calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
+    calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
 //  std::cout << "enter calcDistanceCostRebound"<< std::endl;   
     // calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
 // std::cout << "enter combineCostRebound3"<< std::endl;
     // feasibilitycost means maxmin vel or acc limitation
-    // calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
+    calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
 // std::cout << "enter combineCostRebound4"<< std::endl;
     // calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
 
@@ -1892,15 +1896,15 @@ std::cout << "n="<<n<<endl;
     // calcSwarmCost(cps_.points, f_swarm, g_swarm);
 // std::cout << "enter combineCostRebound5"<< std::endl;
 
-    calcSwarmCost_new(cps_.points, f_swarm, g_swarm);
+    // calcSwarmCost_new(cps_.points, f_swarm, g_swarm);
 
     // tend to the last 3 ctl pts 
     // calcTerminalCost(cps_.points, f_terminal, g_terminal);
-    double weigh_smoothness = 0.2;
+    double weigh_smoothness = 1;
     double weigh_swarmcost = 0.6;
-    double weigh_feasibility = 0.2;
+    double weigh_feasibility = 1;
     // f_combine = weigh_smoothness * f_smoothness + weigh_swarmcost * f_swarm + weigh_feasibility * f_feasibility;
-    f_combine = f_swarm;
+    f_combine = weigh_smoothness * f_smoothness + weigh_feasibility * f_feasibility;
     // std::cout<<"f_smoothness:"<<f_smoothness<<endl;
     // std::cout<<"f_swarm:"<<f_swarm<<endl;
     std::cout<<"f_combine:"<<f_combine<<endl;
@@ -1909,7 +1913,7 @@ std::cout << "n="<<n<<endl;
     //printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
     // Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weigh_swarmcost * g_swarm + weigh_feasibility * g_feasibility;
-    Eigen::MatrixXd grad_3D = g_swarm;
+    Eigen::MatrixXd grad_3D =  weigh_smoothness * g_smoothness + weigh_feasibility * g_feasibility;
     grad_3D.row(2) = Eigen::RowVectorXd::Zero(grad_3D.cols());
     std::cout << " gradient 3D:"<< std::endl;
     std::cout<<grad_3D<<std::endl;
