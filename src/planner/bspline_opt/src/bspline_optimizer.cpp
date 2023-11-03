@@ -789,6 +789,10 @@ namespace ego_planner
     // int end_idx = q.cols() - order_;
     int end_idx = q.cols();
     int start_idx = order_-1;
+
+    // modify two threshhold below to control 
+    auto thresh_fusion = 10;
+    auto thresh_nofusion =20;
     // double t_now = ros::Time::now().toSec();
     // std::cout<<"q:"<<endl;
     // std::cout << q << std::endl;
@@ -824,8 +828,22 @@ namespace ego_planner
 
         Eigen::Vector3d dist_vec = swarm_prid - cps_.points.col(i);
         double distance = dist_vec.squaredNorm();
-        cost += swarm_trajs_->at(id).probability_ * distance /pow(i,2) ;
-        gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / pow(i,2) * 50;  
+        cost += swarm_trajs_->at(id).probability_ * distance  ;
+        // gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / exp(i) * 50;  
+        gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / exp(i) * 50 * (distance/(0.05*pow(distance,2)+5)) ;  
+        // if (distance<=10)
+        // {
+        //   gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) *50 ;  
+        // }
+        // else 
+        // {
+        //   // gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) * exp(-distance) ;  
+        //   gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / i /i  ; 
+        // }
+
+        
+        // cost += swarm_trajs_->at(id).probability_ * log(distance+1)  ;
+        // gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec)  ;
         
         // std::cout << "swarmprid:\n"<<swarm_prid<< std::endl;  
         // std::cout << "prob:"<<swarm_trajs_->at(id).probability_<< std::endl;  
@@ -1220,7 +1238,7 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
     ts_inv2 = 1 / ts / ts;
     // FIXME  adjust this value
     max_vel_ = 10;
-    max_acc_ = 2;
+    max_acc_ = 3;
 
 
     /* velocity feasibility */
@@ -1563,11 +1581,11 @@ std::cout << "enter calcFeasibilityCost00"<< std::endl;
       // std::cout << cps_.points.size()<< ", "<< variable_num_ * sizeof(q[0]) << std::endl;
       memcpy(q, cps_.points.data() + 3 * start_id, variable_num_ * sizeof(q[0]));
 
-      std::cout<<"order:"<<order_<<endl;
-      std::cout << "Array q:\n";
-      for (int i = 0; i < variable_num_; ++i) {
-          std::cout << "q[" << i << "] = " << q[i] << "\n";
-      }
+      // std::cout<<"order:"<<order_<<endl;
+      // std::cout << "Array q:\n";
+      // for (int i = 0; i < variable_num_; ++i) {
+      //     std::cout << "q[" << i << "] = " << q[i] << "\n";
+      // }
 
       // std::cout << "Array size: " << sizeof(q) / sizeof(q[0]) << "\n";
       // std::cout << "after memcpy" << std::endl;
@@ -1893,8 +1911,8 @@ std::cout << "n="<<n<<endl;
     // Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weigh_swarmcost * g_swarm + weigh_feasibility * g_feasibility;
     Eigen::MatrixXd grad_3D = g_swarm;
     grad_3D.row(2) = Eigen::RowVectorXd::Zero(grad_3D.cols());
-    // std::cout << " gradient 3D:"<< std::endl;
-    // std::cout<<grad_3D<<std::endl;
+    std::cout << " gradient 3D:"<< std::endl;
+    std::cout<<grad_3D<<std::endl;
     // Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
     //Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_mov_objs;
     memcpy(grad, grad_3D.data() + 3 * start_idx, n * sizeof(grad[0]));
