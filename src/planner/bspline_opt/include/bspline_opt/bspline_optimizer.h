@@ -198,6 +198,7 @@ namespace ego_planner
     // newly add function
     void calcSwarmCost_new(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     void calcTerminalAndLaneCenterCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
+    void calYawcost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
 
     static int earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls);
     static double costFunctionRebound(void *func_data, const double *x, double *grad, const int n);

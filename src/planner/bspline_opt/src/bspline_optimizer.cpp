@@ -828,7 +828,8 @@ namespace ego_planner
 
         Eigen::Vector3d dist_vec = swarm_prid - cps_.points.col(i);
         double distance = dist_vec.squaredNorm();
-        cost += swarm_trajs_->at(id).probability_ * distance  ;
+        // cost += swarm_trajs_->at(id).probability_ * distance  ;
+        cost += swarm_trajs_->at(id).probability_ * distance * 25 * (distance/(0.05*pow(distance,2)+5)) / exp(i);
         // gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / exp(i) * 50;  
         gradient.col(i) += - swarm_trajs_->at(id).probability_ * (dist_vec) / exp(i) * 50 * (distance/(0.05*pow(distance,2)+5)) ;  
         // if (distance<=10)
@@ -1033,6 +1034,44 @@ namespace ego_planner
       gradient.col(i + 1) += df_dx / 6;
     }
   }
+
+
+
+  void BsplineOptimizer::calYawcost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+  {
+    cost = 0.0;
+    int start_idx = order_-2;
+    int end_idx = q.cols()-2;
+
+    Eigen::Vector3d vel,acc;
+    Eigen::Vector2d vel2d,acc2d;
+    for (int i=start_idx;i<end_idx;i++)
+    {
+      vel = q.col(i+1)-q.col(i);
+      acc = q.col(i+2)-2*q.col(i+1)+q.col(i);
+      vel2d = vel.head<2>();
+      acc2d = acc.head<2>();
+      // Eigen::Vector2d vector2d = vector3d.head<2>();
+      // double projection_magnitude = (vel[0]*acc[0] + vel[1]*acc[1]) / (vel[0]*vel[0] + vel[1]*vel[1]);
+      double acc_parallel_magnitude = vel2d.dot(acc2d)/ vel2d.squaredNorm();
+      Eigen::Vector2d acc_parallel_component = acc_parallel_magnitude  * vel2d;
+      Eigen::Vector2d acc_vertical_component = acc2d - acc_parallel_component;
+      Eigen::Vector3d acc_vertical_3d = Eigen::Vector3d::Zero() ;
+      acc_vertical_3d(0) = acc_vertical_component(0);
+      acc_vertical_3d(1) = acc_vertical_component(1);
+      
+      cost += acc_vertical_component.squaredNorm();
+      gradient.col(i+2) += acc_vertical_3d;
+      gradient.col(i+1) += acc_vertical_3d * (-2 - acc_parallel_magnitude);
+      gradient.col(i) += acc_vertical_3d * (1 + acc_parallel_magnitude);
+    }
+  }
+
+
+
+
+
+
 
   void BsplineOptimizer::calcSmoothnessCost(const Eigen::MatrixXd &q, double &cost,
                                             Eigen::MatrixXd &gradient, bool falg_use_jerk /* = true*/)
@@ -1871,7 +1910,7 @@ std::cout << "n="<<n<<endl;
 // std::cout << cps_.points  << std::endl;
 
     /* ---------- evaluate cost and gradient ---------- */
-    double f_smoothness, f_distance, f_feasibility /*, f_mov_objs*/, f_swarm, f_terminal;
+    double f_smoothness, f_distance, f_feasibility /*, f_mov_objs*/, f_swarm, f_terminal, f_yaw;
 
     Eigen::MatrixXd g_smoothness = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_distance = Eigen::MatrixXd::Zero(3, cps_.size);
@@ -1879,16 +1918,17 @@ std::cout << "n="<<n<<endl;
     // Eigen::MatrixXd g_mov_objs = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_swarm = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_terminal = Eigen::MatrixXd::Zero(3, cps_.size);
+    Eigen::MatrixXd g_yaw = Eigen::MatrixXd::Zero(3, cps_.size);
 
     // g means gradient
     // we need calcSmoothnessCost calcDistanceCostRebound calcFeasibilityCost calcSwarmCost() calcTerminalCost(add lane center)
 // std::cout << "enter calcSmoothnessCost"<< std::endl;
-    calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
+    // calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
 //  std::cout << "enter calcDistanceCostRebound"<< std::endl;   
     // calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
 // std::cout << "enter combineCostRebound3"<< std::endl;
     // feasibilitycost means maxmin vel or acc limitation
-    calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
+    // calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
 // std::cout << "enter combineCostRebound4"<< std::endl;
     // calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
 
@@ -1898,13 +1938,16 @@ std::cout << "n="<<n<<endl;
 
     // calcSwarmCost_new(cps_.points, f_swarm, g_swarm);
 
+    calYawcost(cps_.points, f_yaw, g_yaw);
+
     // tend to the last 3 ctl pts 
     // calcTerminalCost(cps_.points, f_terminal, g_terminal);
     double weigh_smoothness = 1;
-    double weigh_swarmcost = 0.6;
+    double weigh_swarmcost = 1;
     double weigh_feasibility = 1;
     // f_combine = weigh_smoothness * f_smoothness + weigh_swarmcost * f_swarm + weigh_feasibility * f_feasibility;
-    f_combine = weigh_smoothness * f_smoothness + weigh_feasibility * f_feasibility;
+    // f_combine = weigh_smoothness * f_smoothness + weigh_feasibility * f_feasibility;
+    f_combine = f_yaw;
     // std::cout<<"f_smoothness:"<<f_smoothness<<endl;
     // std::cout<<"f_swarm:"<<f_swarm<<endl;
     std::cout<<"f_combine:"<<f_combine<<endl;
@@ -1913,7 +1956,8 @@ std::cout << "n="<<n<<endl;
     //printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
     // Eigen::MatrixXd grad_3D = weigh_smoothness * g_smoothness + weigh_swarmcost * g_swarm + weigh_feasibility * g_feasibility;
-    Eigen::MatrixXd grad_3D =  weigh_smoothness * g_smoothness + weigh_feasibility * g_feasibility;
+    // Eigen::MatrixXd grad_3D =  weigh_smoothness * g_smoothness + weigh_feasibility * g_feasibility;
+    Eigen::MatrixXd grad_3D = g_yaw;
     grad_3D.row(2) = Eigen::RowVectorXd::Zero(grad_3D.cols());
     std::cout << " gradient 3D:"<< std::endl;
     std::cout<<grad_3D<<std::endl;
